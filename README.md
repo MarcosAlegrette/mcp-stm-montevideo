@@ -12,9 +12,9 @@
 npx mcp-stm-montevideo
 ```
 
-Los datos se descargan automáticamente desde los datos abiertos de la Intendencia de Montevideo (CKAN) y se cachean en memoria.
+Los datos se descargan automáticamente desde los datos abiertos de la Intendencia de Montevideo (CKAN). La primera ejecución tarda ~60s mientras descarga y cachea en disco (`~/.cache/mcp-stm-montevideo/`). Las ejecuciones siguientes cargan desde el caché en ~2s. El servidor pre-carga los datos al iniciar para que la primera consulta sea instantánea.
 
-*Data is downloaded automatically from Montevideo's open data portal (CKAN) and cached in memory.*
+*Data downloads automatically from Montevideo's open data portal (CKAN). First run takes ~60s to download and cache to disk (`~/.cache/mcp-stm-montevideo/`). Subsequent runs load from disk cache in ~2s. The server warms up data on startup so the first query is instant.*
 
 ---
 
@@ -121,9 +121,9 @@ Los datos provienen de los **Datos Abiertos de la Intendencia de Montevideo**:
 - Dataset paradas: coordenadas en EPSG:32721 (UTM Zone 21S), convertidas a WGS84
 - Dataset recorridos y líneas: origen/destino de cada variante
 
-Los datos se actualizan automáticamente (cache de 1h para horarios, 24h para paradas y líneas).
+Los datos se cachean en disco por 6 meses y en memoria por 24h. El caché en disco (`~/.cache/mcp-stm-montevideo/`) persiste entre reinicios del servidor, eliminando la descarga de ~60s en ejecuciones posteriores.
 
-*Data comes from Montevideo's open data portal (Intendencia de Montevideo). Schedules cached for 1h, stops and routes for 24h.*
+*Data is cached to disk for 6 months and in memory for 24h. The disk cache (`~/.cache/mcp-stm-montevideo/`) persists across server restarts, eliminating the ~60s download on subsequent runs.*
 
 ---
 

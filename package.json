@@ -46,7 +46,7 @@
   "bugs": {
     "url": "https://github.com/chaba11/mcp-stm-montevideo/issues"
   },
-  "homepage": "https://github.com/chaba11/mcp-stm-montevideo#readme",
+  "homepage": "https://landing.stm.paltickets.uy",
   "dependencies": {
     "@hono/node-server": "^1.19.9",
     "@hono/swagger-ui": "^0.5.3",
