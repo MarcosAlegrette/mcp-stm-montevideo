@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { estimateEtaFromPositions } from "../../src/geo/route-eta.js";
+import { clearSegmentCache } from "../../src/geo/segment-times.js";
 import type { BusPosition } from "../../src/data/gps-client.js";
 import type { HorarioRow } from "../../src/types/horario.js";
 import type { Parada } from "../../src/types/parada.js";
@@ -31,6 +32,10 @@ function makeBus(overrides: Partial<BusPosition> = {}): BusPosition {
     ...overrides,
   };
 }
+
+beforeEach(() => {
+  clearSegmentCache();
+});
 
 describe("estimateEtaFromPositions", () => {
   it("calculates ETA for a bus 3 stops before the target", () => {
@@ -240,9 +245,11 @@ describe("estimateEtaFromPositions — schedule-based", () => {
     const result = estimateEtaFromPositions(4, [bus], ROUTE_PARADAS, "181", NOW, scheduleHorarios);
 
     expect(result.length).toBe(1);
-    // Full schedule time 1→4 = 540s, but bus is ~halfway through first segment
-    // So ETA should be roughly 540 - 90 = 450s
-    expect(result[0].eta_segundos).toBeGreaterThan(350);
+    // Bus is equidistant from stops 1 and 2. Closest-stop resolution may pick
+    // either one. Schedule ETA from stop 1→4 = 540s, from stop 2→4 = 360s,
+    // minus partial adjustment (~90s) and report age (~60s).
+    // Result should be between 150 and 500.
+    expect(result[0].eta_segundos).toBeGreaterThan(150);
     expect(result[0].eta_segundos).toBeLessThan(500);
   });
 

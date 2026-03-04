@@ -12,10 +12,20 @@ export interface SegmentTimeTable {
   ordinalToStopId: Map<number, number>;
   /** paradaId → ordinal */
   stopIdToOrdinal: Map<number, number>;
+  /** Pre-sorted ordinals for fast range lookups */
+  sortedOrdinals: number[];
 }
 
 /** Minimum segment time in seconds (when schedule shows 0 delta) */
 const MIN_SEGMENT_SECONDS = 30;
+
+/** Module-level cache for segment tables: "codVariante:tipoDia" → table */
+const segmentCache = new Map<string, SegmentTimeTable | null>();
+
+/** Clear the segment table cache (for tests and invalidation). */
+export function clearSegmentCache(): void {
+  segmentCache.clear();
+}
 
 /**
  * Build a segment time table for a specific variant and day type.
@@ -33,11 +43,19 @@ export function buildSegmentTimeTable(
   codVariante: number,
   tipoDia: TipoDiaValue
 ): SegmentTimeTable | null {
+  const cacheKey = `${codVariante}:${tipoDia}`;
+  if (segmentCache.has(cacheKey)) {
+    return segmentCache.get(cacheKey)!;
+  }
+
   // Filter
   const filtered = horarios.filter(
     (h) => h.cod_variante === codVariante && h.tipo_dia === tipoDia
   );
-  if (filtered.length === 0) return null;
+  if (filtered.length === 0) {
+    segmentCache.set(cacheKey, null);
+    return null;
+  }
 
   // Group by frecuencia (trip)
   const trips = new Map<number, HorarioRow[]>();
@@ -82,7 +100,10 @@ export function buildSegmentTimeTable(
     }
   }
 
-  if (deltaAccum.size === 0) return null;
+  if (deltaAccum.size === 0) {
+    segmentCache.set(cacheKey, null);
+    return null;
+  }
 
   // Average deltas
   const segmentSeconds = new Map<string, number>();
@@ -91,7 +112,10 @@ export function buildSegmentTimeTable(
     segmentSeconds.set(key, Math.round(avg));
   }
 
-  return { segmentSeconds, ordinalToStopId, stopIdToOrdinal };
+  const sortedOrdinals = Array.from(ordinalToStopId.keys()).sort((a, b) => a - b);
+  const table: SegmentTimeTable = { segmentSeconds, ordinalToStopId, stopIdToOrdinal, sortedOrdinals };
+  segmentCache.set(cacheKey, table);
+  return table;
 }
 
 /**
@@ -111,11 +135,8 @@ export function getSegmentTravelTime(
     return null;
   }
 
-  // Collect all ordinals in the table and sort them
-  const ordinals = Array.from(table.ordinalToStopId.keys()).sort((a, b) => a - b);
-
-  // Find ordinals in range [fromOrdinal, toOrdinal]
-  const inRange = ordinals.filter((o) => o >= fromOrdinal && o <= toOrdinal);
+  // Use pre-sorted ordinals, filter to range [fromOrdinal, toOrdinal]
+  const inRange = table.sortedOrdinals.filter((o) => o >= fromOrdinal && o <= toOrdinal);
   if (inRange.length < 2) return null;
 
   let total = 0;

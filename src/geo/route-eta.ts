@@ -15,6 +15,7 @@ import {
   getSegmentTravelTime,
   type SegmentTimeTable,
 } from "./segment-times.js";
+import { buildSpatialGrid, getCandidates } from "./spatial-grid.js";
 
 export interface GpsEstimatedBus {
   id_vehiculo: string;
@@ -80,6 +81,12 @@ export function estimateEtaFromPositions(
     arr.sort((a, b) => a.ordinal - b.ordinal);
   }
 
+  // Build spatial grids per variant for fast closest-stop lookup
+  const gridsPerVariante = new Map<number, ReturnType<typeof buildSpatialGrid>>();
+  for (const [variantId, paradas] of paradasByVariante) {
+    gridsPerVariante.set(variantId, buildSpatialGrid(paradas));
+  }
+
   // Build segment time tables from schedule data (once, outside the bus loop)
   let segmentTables: Map<number, SegmentTimeTable> | null = null;
   if (horarios && horarios.length > 0) {
@@ -122,17 +129,34 @@ export function estimateEtaFromPositions(
         continue;
       }
 
-      // Find the closest stop to the bus's current position
+      // Find the closest stop to the bus's current position using spatial grid
       let closestIdx = 0;
       let closestDist = Infinity;
-      for (let i = 0; i < variantParadas.length; i++) {
-        const d = getDistance(
-          { latitude: bus.latitud, longitude: bus.longitud },
-          { latitude: variantParadas[i].lat, longitude: variantParadas[i].lng }
-        );
-        if (d < closestDist) {
-          closestDist = d;
-          closestIdx = i;
+      const grid = gridsPerVariante.get(variantId)!;
+      const candidates = getCandidates(grid, bus.latitud, bus.longitud);
+
+      if (candidates.length > 0) {
+        for (const c of candidates) {
+          const d = getDistance(
+            { latitude: bus.latitud, longitude: bus.longitud },
+            { latitude: c.lat, longitude: c.lng }
+          );
+          if (d < closestDist) {
+            closestDist = d;
+            closestIdx = c.index;
+          }
+        }
+      } else {
+        // Fallback to linear scan when bus is far from any grid cell
+        for (let i = 0; i < variantParadas.length; i++) {
+          const d = getDistance(
+            { latitude: bus.latitud, longitude: bus.longitud },
+            { latitude: variantParadas[i].lat, longitude: variantParadas[i].lng }
+          );
+          if (d < closestDist) {
+            closestDist = d;
+            closestIdx = i;
+          }
         }
       }
 

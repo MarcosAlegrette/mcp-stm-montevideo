@@ -3,9 +3,17 @@ import {
   buildSegmentTimeTable,
   getSegmentTravelTime,
   buildAllSegmentTables,
+  clearSegmentCache,
 } from "../../src/geo/segment-times.js";
 import { makeTripHorarios } from "../fixtures/schedule-data.js";
 import { TipoDia } from "../../src/types/horario.js";
+
+// Clear segment cache before each test to ensure isolation
+import { beforeEach } from "vitest";
+
+beforeEach(() => {
+  clearSegmentCache();
+});
 
 describe("buildSegmentTimeTable", () => {
   it("builds table from a single trip", () => {
@@ -100,6 +108,69 @@ describe("buildSegmentTimeTable", () => {
     expect(table!.stopIdToOrdinal.get(100)).toBe(1);
     expect(table!.stopIdToOrdinal.get(101)).toBe(2);
     expect(table!.stopIdToOrdinal.get(102)).toBe(3);
+  });
+
+  it("builds sortedOrdinals in ascending order", () => {
+    const horarios = makeTripHorarios(5200, 1, TipoDia.HABIL, [
+      { paradaId: 102, ordinal: 3, hora: 537 },
+      { paradaId: 100, ordinal: 1, hora: 530 },
+      { paradaId: 101, ordinal: 2, hora: 533 },
+    ]);
+
+    const table = buildSegmentTimeTable(horarios, 5200, TipoDia.HABIL);
+    expect(table!.sortedOrdinals).toEqual([1, 2, 3]);
+  });
+});
+
+describe("segment table cache", () => {
+  it("returns cached table on second call", () => {
+    const horarios = makeTripHorarios(5200, 1, TipoDia.HABIL, [
+      { paradaId: 100, ordinal: 1, hora: 530 },
+      { paradaId: 101, ordinal: 2, hora: 533 },
+    ]);
+
+    const table1 = buildSegmentTimeTable(horarios, 5200, TipoDia.HABIL);
+    const table2 = buildSegmentTimeTable(horarios, 5200, TipoDia.HABIL);
+    // Same reference (cached)
+    expect(table1).toBe(table2);
+  });
+
+  it("returns different tables for different keys", () => {
+    const horarios = makeTripHorarios(5200, 1, TipoDia.HABIL, [
+      { paradaId: 100, ordinal: 1, hora: 530 },
+      { paradaId: 101, ordinal: 2, hora: 533 },
+    ]);
+    const satHorarios = makeTripHorarios(5200, 1, TipoDia.SABADO, [
+      { paradaId: 100, ordinal: 1, hora: 700 },
+      { paradaId: 101, ordinal: 2, hora: 710 },
+    ]);
+
+    const habil = buildSegmentTimeTable([...horarios, ...satHorarios], 5200, TipoDia.HABIL);
+    const sabado = buildSegmentTimeTable([...horarios, ...satHorarios], 5200, TipoDia.SABADO);
+    expect(habil).not.toBe(sabado);
+  });
+
+  it("clearSegmentCache invalidates cached tables", () => {
+    const horarios = makeTripHorarios(5200, 1, TipoDia.HABIL, [
+      { paradaId: 100, ordinal: 1, hora: 530 },
+      { paradaId: 101, ordinal: 2, hora: 533 },
+    ]);
+
+    const table1 = buildSegmentTimeTable(horarios, 5200, TipoDia.HABIL);
+    clearSegmentCache();
+    const table2 = buildSegmentTimeTable(horarios, 5200, TipoDia.HABIL);
+    // Different references after cache clear
+    expect(table1).not.toBe(table2);
+    // But same values
+    expect(table1!.segmentSeconds.get("1-2")).toBe(table2!.segmentSeconds.get("1-2"));
+  });
+
+  it("caches null results", () => {
+    const table1 = buildSegmentTimeTable([], 9999, TipoDia.HABIL);
+    expect(table1).toBeNull();
+    // Second call should also return null from cache
+    const table2 = buildSegmentTimeTable([], 9999, TipoDia.HABIL);
+    expect(table2).toBeNull();
   });
 });
 
