@@ -81,11 +81,9 @@ function buildSpec() {
           operationId: "proximosBuses",
           summary: "Próximos buses en una parada",
           description:
-            "Consulta los próximos ómnibus que pasan por una parada del STM. " +
-            "Podés identificar la parada de tres formas: por parada_id, por calle1+calle2 (intersección), " +
-            "o por calle1 sola. IMPORTANTE: no necesitás llamar a buscarParadas primero — " +
-            "pasá calle1 y calle2 directamente y este endpoint busca la parada automáticamente. " +
-            "Usá este endpoint directamente cuando el usuario pregunte cuándo pasa un bus.",
+            "Próximos ómnibus en una parada STM. Identificá la parada por parada_id, calle1+calle2, " +
+            "o calle1 sola. No necesitás llamar a buscarParadas primero — pasá calle1 y calle2 directamente " +
+            "y busca la parada automáticamente.",
           parameters: [
             { name: "parada_id", in: "query", schema: { type: "integer" }, description: "ID de la parada (opcional — si no lo tenés, usá calle1+calle2)", example: 1234 },
             { name: "calle1", in: "query", schema: { type: "string" }, description: "Calle principal o avenida (ej: 'Bv España'). Alternativa a parada_id — busca la parada automáticamente.", example: "Bv España" },
