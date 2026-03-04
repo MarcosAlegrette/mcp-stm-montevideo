@@ -2,11 +2,12 @@ import * as z from "zod/v4";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getDistance } from "geolib";
 import type { CkanClient } from "../data/ckan-client.js";
-import { findNearestParadas } from "../geo/distance.js";
+import { findNearestParadasIndexed } from "../geo/distance.js";
+import { getDataIndexes } from "../data/data-indexes.js";
+import { buildSpatialGrid, getCandidates } from "../geo/spatial-grid.js";
 import { geocodeIntersection } from "../geo/geocode.js";
 import { fuzzySearchParadas } from "../geo/search.js";
 import type { Parada } from "../types/parada.js";
-import type { LineaVariante } from "../types/linea.js";
 
 // --- Types ---
 
@@ -104,39 +105,8 @@ async function resolveLocation(
   return { lat: top.lat, lon: top.lng };
 }
 
-// --- Build lookup maps ---
-interface LookupMaps {
-  variantesByParadaId: Map<number, Set<number>>;
-  paradasByVariante: Map<number, Parada[]>;
-  paradaForVariante: Map<string, Parada>; // `${id}:${variante}` → Parada
-  lineasMap: Map<number, LineaVariante>;
-}
-
-function buildMaps(paradas: Parada[], lineas: LineaVariante[]): LookupMaps {
-  const variantesByParadaId = new Map<number, Set<number>>();
-  const paradasByVariante = new Map<number, Parada[]>();
-  const paradaForVariante = new Map<string, Parada>();
-
-  for (const p of paradas) {
-    if (!variantesByParadaId.has(p.id)) variantesByParadaId.set(p.id, new Set());
-    variantesByParadaId.get(p.id)!.add(p.variante);
-
-    paradaForVariante.set(`${p.id}:${p.variante}`, p);
-
-    if (!paradasByVariante.has(p.variante)) paradasByVariante.set(p.variante, []);
-    paradasByVariante.get(p.variante)!.push(p);
-  }
-
-  // Sort each variant's stops by ordinal
-  for (const stops of paradasByVariante.values()) {
-    stops.sort((a, b) => a.ordinal - b.ordinal);
-  }
-
-  const lineasMap = new Map<number, LineaVariante>();
-  for (const lv of lineas) lineasMap.set(lv.codVariante, lv);
-
-  return { variantesByParadaId, paradasByVariante, paradaForVariante, lineasMap };
-}
+// LookupMaps type re-exported from data-indexes
+import type { LookupMaps } from "../data/data-indexes.js";
 
 // --- Phase A: Direct routes ---
 function findDirectRoutes(
@@ -275,9 +245,16 @@ function findTransferRoutes(
     }
   }
 
+  // Build spatial grid over destination-reachable stops for O(1) proximity lookup
+  const destGrid = buildSpatialGrid(
+    stopsReachingDest.map((d) => ({ lat: d.stop.lat, lng: d.stop.lng }))
+  );
+
   // Find transfer points: reachable stops near stops-reaching-dest
   for (const r of reachableFromOrigin) {
-    for (const d of stopsReachingDest) {
+    const candidates = getCandidates(destGrid, r.stop.lat, r.stop.lng);
+    for (const c of candidates) {
+      const d = stopsReachingDest[c.index];
       // Skip same variant (already handled in direct routes)
       if (r.codVariante === d.codVariante) continue;
 
@@ -407,18 +384,23 @@ export async function comoLlegarHandler(
     );
   }
 
-  const nearOrigin = findNearestParadas(
+  const indexes = getDataIndexes();
+  const grid = indexes.getParadasGrid(paradas);
+
+  const nearOrigin = findNearestParadasIndexed(
     originPoint.lat,
     originPoint.lon,
     paradas,
+    grid,
     max_caminata_metros,
     20
   ) as ParadaConDist[];
 
-  const nearDest = findNearestParadas(
+  const nearDest = findNearestParadasIndexed(
     destPoint.lat,
     destPoint.lon,
     paradas,
+    grid,
     max_caminata_metros,
     20
   ) as ParadaConDist[];
@@ -434,7 +416,7 @@ export async function comoLlegarHandler(
     );
   }
 
-  const maps = buildMaps(paradas, lineas);
+  const maps = indexes.getLookupMaps(paradas, lineas);
 
   // Collect all route options
   let allRoutes: RouteOption[] = findDirectRoutes(nearOrigin, nearDest, maps);

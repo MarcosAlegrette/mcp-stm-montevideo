@@ -1,4 +1,5 @@
 import type { Parada } from "../types/parada.js";
+import { getDataIndexes } from "../data/data-indexes.js";
 
 // Common Spanish abbreviations used in Montevideo street names
 const ABBREVIATIONS: [RegExp, string][] = [
@@ -53,10 +54,13 @@ export function fuzzySearchParadas(query: string, paradas: Parada[]): ParadaSear
 
   const results: ParadaSearchResult[] = [];
 
+  const indexes = getDataIndexes();
+
   for (const parada of paradas) {
-    const calle = normalizeText(parada.calle);
-    const esquina = normalizeText(parada.esquina);
-    const linea = normalizeText(parada.linea);
+    const norm = indexes.getNormalized(parada, paradas);
+    const calle = norm.calle;
+    const esquina = norm.esquina;
+    const linea = norm.linea;
     const combined = `${calle} ${esquina} ${linea}`;
 
     let score = 0;

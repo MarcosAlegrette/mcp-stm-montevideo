@@ -1,7 +1,8 @@
 import * as z from "zod/v4";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CkanClient } from "../data/ckan-client.js";
-import { findNearestParadas } from "../geo/distance.js";
+import { findNearestParadasIndexed } from "../geo/distance.js";
+import { getDataIndexes } from "../data/data-indexes.js";
 import { fuzzySearchParadas } from "../geo/search.js";
 import { geocodeIntersection, geocodeAddress, geocodePlace } from "../geo/geocode.js";
 import type { Parada } from "../types/parada.js";
@@ -193,7 +194,8 @@ export async function buscarParadaHandler(
     );
   }
 
-  let nearest = findNearestParadas(centerLat, centerLon, paradas, radio_metros, 10);
+  const grid = getDataIndexes().getParadasGrid(paradas);
+  let nearest = findNearestParadasIndexed(centerLat, centerLon, paradas, grid, radio_metros, 10);
 
   if (candidateIds !== null) {
     nearest = nearest.filter((p) => candidateIds!.has(p.id));

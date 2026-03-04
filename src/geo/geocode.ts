@@ -1,6 +1,7 @@
 import type { Parada } from "../types/parada.js";
 import { normalizeText } from "./search.js";
 import { getLocalGeocoder } from "./local-geocoder.js";
+import { getDataIndexes } from "../data/data-indexes.js";
 
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 const USER_AGENT = "mcp-stm-montevideo/1.0 (github.com/chaba11/mcp-stm-montevideo)";
@@ -97,21 +98,20 @@ export function geocodeFromParadas(
   if (!calle1.trim()) return null;
 
   const norm1 = normalizeText(calle1);
+  const indexes = getDataIndexes();
 
   // If calle2 is empty, search by calle1 alone
   if (!calle2.trim()) {
     const exactMatches = paradas.filter((p) => {
-      const calle = normalizeText(p.calle);
-      const esquina = normalizeText(p.esquina);
-      return allTokensMatch(norm1, calle) || allTokensMatch(norm1, esquina);
+      const n = indexes.getNormalized(p, paradas);
+      return allTokensMatch(norm1, n.calle) || allTokensMatch(norm1, n.esquina);
     });
     if (exactMatches.length > 0) return centroid(exactMatches);
 
     // Fuzzy fallback: tolerates encoding artifacts and typos
     const fuzzyMatches = paradas.filter((p) => {
-      const calle = normalizeText(p.calle);
-      const esquina = normalizeText(p.esquina);
-      return allTokensFuzzyMatch(norm1, calle) || allTokensFuzzyMatch(norm1, esquina);
+      const n = indexes.getNormalized(p, paradas);
+      return allTokensFuzzyMatch(norm1, n.calle) || allTokensFuzzyMatch(norm1, n.esquina);
     });
     return fuzzyMatches.length > 0 ? centroid(fuzzyMatches) : null;
   }
@@ -119,22 +119,20 @@ export function geocodeFromParadas(
   const norm2 = normalizeText(calle2);
 
   const exactMatches = paradas.filter((p) => {
-    const calle = normalizeText(p.calle);
-    const esquina = normalizeText(p.esquina);
+    const n = indexes.getNormalized(p, paradas);
     return (
-      (allTokensMatch(norm1, calle) && allTokensMatch(norm2, esquina)) ||
-      (allTokensMatch(norm2, calle) && allTokensMatch(norm1, esquina))
+      (allTokensMatch(norm1, n.calle) && allTokensMatch(norm2, n.esquina)) ||
+      (allTokensMatch(norm2, n.calle) && allTokensMatch(norm1, n.esquina))
     );
   });
   if (exactMatches.length > 0) return centroid(exactMatches);
 
   // Fuzzy fallback for intersection search
   const fuzzyMatches = paradas.filter((p) => {
-    const calle = normalizeText(p.calle);
-    const esquina = normalizeText(p.esquina);
+    const n = indexes.getNormalized(p, paradas);
     return (
-      (allTokensFuzzyMatch(norm1, calle) && allTokensFuzzyMatch(norm2, esquina)) ||
-      (allTokensFuzzyMatch(norm2, calle) && allTokensFuzzyMatch(norm1, esquina))
+      (allTokensFuzzyMatch(norm1, n.calle) && allTokensFuzzyMatch(norm2, n.esquina)) ||
+      (allTokensFuzzyMatch(norm2, n.calle) && allTokensFuzzyMatch(norm1, n.esquina))
     );
   });
   return fuzzyMatches.length > 0 ? centroid(fuzzyMatches) : null;

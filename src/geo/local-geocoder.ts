@@ -54,11 +54,28 @@ function findDataPath(): string | null {
 const PLACE_SCORE_THRESHOLD = 0.6;
 const MAX_INTERSECTION_DISTANCE_M = 30;
 
+interface NormalizedPoi {
+  poi: OsmPoi;
+  nNorm: string;
+  nWords: string[];
+}
+
 export class LocalGeocoder {
   private data: GeocoderData | null;
+  private normalizedPois: NormalizedPoi[] = [];
 
   constructor(data: GeocoderData | null) {
     this.data = data;
+    if (data) {
+      this.normalizedPois = data.pois.map((poi) => {
+        const nNorm = normalizeText(poi.n);
+        return {
+          poi,
+          nNorm,
+          nWords: nNorm.split(" ").filter(Boolean),
+        };
+      });
+    }
   }
 
   /**
@@ -75,18 +92,15 @@ export class LocalGeocoder {
     let bestScore = -1;
     let bestPoi: OsmPoi | null = null;
 
-    for (const poi of this.data.pois) {
-      const normalizedName = normalizeText(poi.n);
-
+    for (const { poi, nNorm, nWords } of this.normalizedPois) {
       // Count how many query tokens match the POI name
       let matchedTokens = 0;
       for (const token of queryTokens) {
-        if (normalizedName.includes(token)) {
+        if (nNorm.includes(token)) {
           matchedTokens++;
         } else if (token.length > 3) {
-          const words = normalizedName.split(" ").filter(Boolean);
           // Check if any word is within edit distance 1
-          if (words.some((w) => levenshteinDistance(token, w) <= 1)) {
+          if (nWords.some((w) => levenshteinDistance(token, w) <= 1)) {
             matchedTokens++;
           }
         }
@@ -127,6 +141,7 @@ export class LocalGeocoder {
     let closestNode1: [number, number] | null = null;
     let closestNode2: [number, number] | null = null;
 
+    outerLoop:
     for (const s1 of matches1) {
       for (const s2 of matches2) {
         for (const n1 of s1.nodes) {
@@ -137,6 +152,7 @@ export class LocalGeocoder {
               closestNode1 = n1;
               closestNode2 = n2;
             }
+            if (minDist < 5) break outerLoop; // close enough
           }
         }
       }

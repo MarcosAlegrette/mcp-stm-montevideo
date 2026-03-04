@@ -5,6 +5,7 @@ import type { Parada } from "../types/parada.js";
 import type { HorarioRow } from "../types/horario.js";
 import type { LineaVariante } from "../types/linea.js";
 import { TipoDia } from "../types/horario.js";
+import { getDataIndexes } from "../data/data-indexes.js";
 
 export interface RecorridoParada {
   parada_id: number;
@@ -50,11 +51,12 @@ function calcAverageFrequency(
   codVariante: number,
   horarios: HorarioRow[]
 ): number | null {
-  const trips = horarios
+  const indexes = getDataIndexes();
+  const variantHorarios = indexes.getHorariosByVariante(codVariante, horarios);
+  const trips = variantHorarios
     .filter(
       (h) =>
         h.cod_ubic_parada === paradaId &&
-        h.cod_variante === codVariante &&
         h.tipo_dia === TipoDia.HABIL
     )
     .map((h) => Math.floor(h.hora / 100) * 60 + (h.hora % 100))
@@ -78,10 +80,9 @@ function buildVariantRoute(
   paradas: Parada[],
   horarios: HorarioRow[]
 ): RecorridoResult {
-  // Get all paradas for this variant, ordered by ordinal
-  const variantParadas = paradas
-    .filter((p) => p.variante === lv.codVariante)
-    .sort((a, b) => a.ordinal - b.ordinal);
+  // Get all paradas for this variant, ordered by ordinal (pre-sorted in index)
+  const indexes = getDataIndexes();
+  const variantParadas = indexes.getParadasByVariante(lv.codVariante, paradas);
 
   // De-duplicate by stop ID (keep lowest ordinal)
   const seen = new Set<number>();

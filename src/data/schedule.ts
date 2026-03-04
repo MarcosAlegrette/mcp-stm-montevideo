@@ -62,6 +62,8 @@ export interface GetNextBusesOptions {
   linea?: string;
   count?: number;
   now?: Date;
+  /** Pre-filtered horarios for this stop (from DataIndexes). Avoids O(N) scan. */
+  stopHorarios?: HorarioRow[];
 }
 
 /**
@@ -73,7 +75,7 @@ export function getNextBuses(
   horarios: HorarioRow[],
   lineas: LineaVariante[]
 ): GetNextBusesResult {
-  const { paradaId, linea, count = 5, now = new Date() } = options;
+  const { paradaId, linea, count = 5, now = new Date(), stopHorarios: stopHorariosPre } = options;
 
   const tipoDia = getTipoDia(now);
   const currentMinutes = getCurrentMinutes(now);
@@ -86,8 +88,8 @@ export function getNextBuses(
 
   const lineaUpper = linea?.trim().toUpperCase();
 
-  // Filter horarios for this stop
-  const stopHorarios = horarios.filter((h) => h.cod_ubic_parada === paradaId);
+  // Filter horarios for this stop (use pre-filtered if available)
+  const stopHorarios = stopHorariosPre ?? horarios.filter((h) => h.cod_ubic_parada === paradaId);
 
   function matchesLinea(h: HorarioRow): boolean {
     if (!lineaUpper) return true;

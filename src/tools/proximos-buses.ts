@@ -4,7 +4,8 @@ import type { CkanClient } from "../data/ckan-client.js";
 import type { GpsClient } from "../data/gps-client.js";
 import type { StopMapper } from "../data/stop-mapper.js";
 import { getNextBuses } from "../data/schedule.js";
-import { findNearestParadas } from "../geo/distance.js";
+import { findNearestParadasIndexed } from "../geo/distance.js";
+import { getDataIndexes } from "../data/data-indexes.js";
 import { geocodeIntersection } from "../geo/geocode.js";
 import { estimateEtaFromPositions } from "../geo/route-eta.js";
 import { fuzzySearchParadas } from "../geo/search.js";
@@ -75,7 +76,8 @@ async function resolveParadaId(
       (await geocodeIntersection(calle1, calle2, primaryPool)) ??
       (lineParadas.length > 0 ? await geocodeIntersection(calle1, calle2, paradas) : null);
     if (!point) return null;
-    const nearest = findNearestParadas(point.lat, point.lon, primaryPool, 500, 1);
+    const grid = getDataIndexes().getParadasGrid(primaryPool);
+    const nearest = findNearestParadasIndexed(point.lat, point.lon, primaryPool, grid, 500, 1);
     if (nearest.length === 0) return null;
     const p = nearest[0];
     return { id: p.id, nombre: `${p.calle}${p.esquina ? " y " + p.esquina : ""}` };
@@ -260,8 +262,9 @@ export async function proximosBusesHandler(
   }
 
   // Static schedule fallback
+  const indexes = getDataIndexes();
   const result = getNextBuses(
-    { paradaId, linea, count: cantidad, now: currentTime },
+    { paradaId, linea, count: cantidad, now: currentTime, stopHorarios: indexes.getHorariosByParada(paradaId, horarios) },
     horarios,
     lineas
   );
