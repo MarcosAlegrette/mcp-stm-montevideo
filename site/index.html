@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mcp-stm-montevideo — Montevideo's transit system, accessible to AI</title>
+<meta name="description" content="MCP server for Montevideo's Metropolitan Transit System (STM). Let LLMs answer questions about bus schedules, routes, and stops in real time.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚌</text></svg>">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;600;700&display=swap');
+
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0a0f;
+    --bg-raised: #12121a;
+    --bg-card: #18182a;
+    --amber: #f5a623;
+    --amber-dim: #c47d12;
+    --amber-glow: rgba(245, 166, 35, 0.15);
+    --cyan: #3ecfcf;
+    --magenta: #e84393;
+    --text: #e8e6e3;
+    --text-dim: #8a8a9a;
+    --mono: 'JetBrains Mono', monospace;
+    --display: 'Space Grotesk', sans-serif;
+    --line-weight: 4px;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--display);
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* ---- Transit line decorative elements ---- */
+  .transit-line {
+    position: absolute;
+    background: var(--amber);
+    border-radius: 2px;
+    opacity: 0.12;
+  }
+  .transit-line.vertical { width: var(--line-weight); }
+  .transit-line.horizontal { height: var(--line-weight); }
+
+  /* ---- Layout ---- */
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  section {
+    padding: 80px 0;
+    position: relative;
+  }
+
+  /* ---- Hero ---- */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+    padding: 120px 0 80px;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -200px;
+    right: -200px;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, var(--amber-glow) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-content { position: relative; z-index: 1; }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-raised);
+    border: 1px solid rgba(245, 166, 35, 0.2);
+    border-radius: 100px;
+    padding: 6px 16px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--amber);
+    margin-bottom: 32px;
+  }
+  .hero-badge .dot {
+    width: 8px; height: 8px;
+    background: var(--amber);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .hero h1 {
+    font-family: var(--mono);
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 700;
+    line-height: 1.1;
+    margin-bottom: 8px;
+  }
+  .hero h1 .accent {
+    color: var(--amber);
+    position: relative;
+  }
+  .hero h1 .accent::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    width: 100%;
+    height: var(--line-weight);
+    background: var(--amber);
+    border-radius: 2px;
+  }
+
+  .hero .tagline {
+    font-size: clamp(1.1rem, 2.5vw, 1.4rem);
+    color: var(--text-dim);
+    margin-bottom: 40px;
+    max-width: 520px;
+  }
+
+  /* Chat bubble */
+  .chat-bubble {
+    background: var(--bg-card);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px 16px 16px 4px;
+    padding: 20px 24px;
+    margin-bottom: 40px;
+    max-width: 520px;
+    position: relative;
+  }
+  .chat-bubble::before {
+    content: 'Usuario';
+    position: absolute;
+    top: -22px;
+    left: 0;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .chat-bubble p {
+    font-size: 1.05rem;
+    color: var(--text);
+  }
+
+  /* CTA buttons */
+  .cta-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s;
+    border: none;
+    cursor: pointer;
+  }
+  .btn-primary {
+    background: var(--amber);
+    color: #0a0a0f;
+  }
+  .btn-primary:hover {
+    background: #ffb940;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px var(--amber-glow);
+  }
+  .btn-secondary {
+    background: var(--bg-raised);
+    color: var(--text);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .btn-secondary:hover {
+    border-color: rgba(255,255,255,0.2);
+    background: var(--bg-card);
+  }
+  .btn svg { width: 16px; height: 16px; }
+
+  /* ---- Section headers ---- */
+  .section-label {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--amber);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 16px;
+  }
+  .section-title {
+    font-size: clamp(1.5rem, 3vw, 2.2rem);
+    font-weight: 700;
+    margin-bottom: 16px;
+  }
+  .section-desc {
+    color: var(--text-dim);
+    font-size: 1.05rem;
+    max-width: 600px;
+    margin-bottom: 48px;
+  }
+
+  /* ---- Tools / Transit Line ---- */
+  .tools-section { background: var(--bg-raised); }
+
+  .transit-route {
+    position: relative;
+    padding-left: 48px;
+  }
+  .transit-route::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: var(--line-weight);
+    background: linear-gradient(to bottom, var(--amber), var(--cyan));
+    border-radius: 2px;
+  }
+
+  .tool-stop {
+    position: relative;
+    padding: 24px 0;
+  }
+  .tool-stop::before {
+    content: '';
+    position: absolute;
+    left: -41px;
+    top: 32px;
+    width: 18px;
+    height: 18px;
+    background: var(--bg);
+    border: var(--line-weight) solid var(--amber);
+    border-radius: 50%;
+    z-index: 1;
+  }
+  .tool-stop:nth-child(2)::before { border-color: #e6a320; }
+  .tool-stop:nth-child(3)::before { border-color: #c4902a; }
+  .tool-stop:nth-child(4)::before { border-color: #6abfbf; }
+  .tool-stop:nth-child(5)::before { border-color: var(--cyan); }
+
+  .tool-stop .tool-name {
+    font-family: var(--mono);
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--amber);
+    margin-bottom: 4px;
+  }
+  .tool-stop:nth-child(4) .tool-name,
+  .tool-stop:nth-child(5) .tool-name { color: var(--cyan); }
+
+  .tool-stop .tool-desc {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+  }
+
+  /* ---- Installation ---- */
+  .install-oneliner {
+    background: var(--bg-card);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 32px;
+    max-width: 480px;
+  }
+  .install-oneliner code {
+    font-family: var(--mono);
+    font-size: 1.05rem;
+    color: var(--amber);
+  }
+  .install-oneliner .prefix {
+    color: var(--text-dim);
+    margin-right: 8px;
+  }
+
+  .copy-btn {
+    background: none;
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--text-dim);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .copy-btn:hover {
+    border-color: var(--amber);
+    color: var(--amber);
+  }
+  .copy-btn.copied {
+    border-color: #4caf50;
+    color: #4caf50;
+  }
+
+  /* Tabs */
+  .config-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 0;
+  }
+  .config-tab {
+    background: var(--bg);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-bottom: none;
+    color: var(--text-dim);
+    padding: 10px 20px;
+    font-family: var(--mono);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 8px 8px 0 0;
+    margin-right: -1px;
+  }
+  .config-tab:hover { color: var(--text); }
+  .config-tab.active {
+    background: var(--bg-card);
+    color: var(--amber);
+    border-color: rgba(255,255,255,0.06);
+  }
+
+  .config-panels {
+    position: relative;
+  }
+  .config-panel {
+    display: none;
+    background: var(--bg-card);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 0 12px 12px 12px;
+    padding: 24px;
+    position: relative;
+  }
+  .config-panel.active { display: block; }
+
+  .config-panel .file-path {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.7;
+    overflow-x: auto;
+  }
+  pre .key { color: var(--cyan); }
+  pre .string { color: var(--amber); }
+  pre .punct { color: var(--text-dim); }
+
+  .config-panel .copy-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+  }
+
+  /* ---- Example conversation ---- */
+  .conversation {
+    max-width: 640px;
+  }
+  .msg {
+    margin-bottom: 24px;
+    padding: 16px 20px;
+    border-radius: 12px;
+  }
+  .msg-user {
+    background: var(--bg-card);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px 12px 12px 4px;
+  }
+  .msg-ai {
+    background: rgba(245, 166, 35, 0.05);
+    border: 1px solid rgba(245, 166, 35, 0.1);
+    border-radius: 12px 12px 4px 12px;
+  }
+  .msg-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+  .msg-user .msg-label { color: var(--text-dim); }
+  .msg-ai .msg-label { color: var(--amber); }
+  .msg p { font-size: 0.95rem; }
+  .msg .tool-call {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--cyan);
+    background: rgba(62, 207, 207, 0.08);
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin: 8px 0;
+    display: inline-block;
+  }
+
+  /* ---- Footer ---- */
+  footer {
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding: 40px 0;
+  }
+  .footer-inner {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+  .footer-links {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .footer-links a {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-dim);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .footer-links a:hover { color: var(--amber); }
+  .footer-meta {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  /* ---- Responsive ---- */
+  @media (max-width: 640px) {
+    section { padding: 60px 0; }
+    .hero { padding: 80px 0 60px; min-height: auto; }
+    .cta-group { flex-direction: column; }
+    .btn { justify-content: center; }
+    .install-oneliner { flex-direction: column; align-items: flex-start; }
+    .footer-inner { flex-direction: column; text-align: center; }
+    .footer-links { justify-content: center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== HERO ===== -->
+<section class="hero">
+  <div class="container hero-content">
+    <div class="hero-badge">
+      <span class="dot"></span>
+      MCP Server
+    </div>
+
+    <h1>
+      <span class="accent">mcp-stm</span><br>
+      montevideo
+    </h1>
+
+    <p class="tagline">Montevideo's transit system, accessible to AI</p>
+
+    <div class="chat-bubble">
+      <p>"¿Cuándo pasa el próximo 181 por Bv España y Libertad?"</p>
+    </div>
+
+    <div class="cta-group">
+      <a href="#install" class="btn btn-primary">Get Started</a>
+      <a href="https://github.com/chaba11/mcp-stm-montevideo" target="_blank" rel="noopener" class="btn btn-secondary">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub
+      </a>
+      <a href="https://chatgpt.com/g/g-69a70f5dc0288191a929b39ba8506973-stm-montevideo" target="_blank" rel="noopener" class="btn btn-secondary">
+        Try on ChatGPT
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ===== WHAT IT DOES ===== -->
+<section class="tools-section">
+  <div class="container">
+    <div class="section-label">What It Does</div>
+    <h2 class="section-title">5 tools for Montevideo transit</h2>
+    <p class="section-desc">
+      An <a href="https://modelcontextprotocol.io" target="_blank" rel="noopener" style="color:var(--amber);text-decoration:underline">MCP</a> server that gives AI assistants access to Montevideo's public transit data &mdash; schedules, routes, stops, and real-time positions from the STM open data portal.
+    </p>
+
+    <div class="transit-route">
+      <div class="tool-stop">
+        <div class="tool-name">buscar_parada</div>
+        <div class="tool-desc">Search stops by location, intersection, or coordinates</div>
+      </div>
+      <div class="tool-stop">
+        <div class="tool-name">proximos_buses</div>
+        <div class="tool-desc">Next buses arriving at a stop</div>
+      </div>
+      <div class="tool-stop">
+        <div class="tool-name">recorrido_linea</div>
+        <div class="tool-desc">Full route of a bus line with all its stops</div>
+      </div>
+      <div class="tool-stop">
+        <div class="tool-name">ubicacion_bus</div>
+        <div class="tool-desc">Real-time bus position (when available)</div>
+      </div>
+      <div class="tool-stop">
+        <div class="tool-name">como_llegar</div>
+        <div class="tool-desc">Route planning from A to B by public transit</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== INSTALLATION ===== -->
+<section id="install">
+  <div class="container">
+    <div class="section-label">Installation</div>
+    <h2 class="section-title">One command, zero config</h2>
+    <p class="section-desc">Run it directly with npx. Data downloads automatically from Montevideo's open data portal and caches in memory.</p>
+
+    <div class="install-oneliner">
+      <code><span class="prefix">$</span> npx mcp-stm-montevideo</code>
+      <button class="copy-btn" data-copy="npx mcp-stm-montevideo">Copy</button>
+    </div>
+
+    <div class="config-tabs">
+      <button class="config-tab active" data-tab="claude-desktop">Claude Desktop</button>
+      <button class="config-tab" data-tab="cursor">Cursor</button>
+      <button class="config-tab" data-tab="claude-code">Claude Code</button>
+    </div>
+
+    <div class="config-panels">
+      <div class="config-panel active" id="tab-claude-desktop">
+        <div class="file-path">~/Library/Application Support/Claude/claude_desktop_config.json</div>
+        <button class="copy-btn" data-copy='{
+  "mcpServers": {
+    "stm-montevideo": {
+      "command": "npx",
+      "args": ["-y", "mcp-stm-montevideo"]
+    }
+  }
+}'>Copy</button>
+        <pre><code><span class="punct">{</span>
+  <span class="key">"mcpServers"</span><span class="punct">:</span> <span class="punct">{</span>
+    <span class="key">"stm-montevideo"</span><span class="punct">:</span> <span class="punct">{</span>
+      <span class="key">"command"</span><span class="punct">:</span> <span class="string">"npx"</span><span class="punct">,</span>
+      <span class="key">"args"</span><span class="punct">:</span> <span class="punct">[</span><span class="string">"-y"</span><span class="punct">,</span> <span class="string">"mcp-stm-montevideo"</span><span class="punct">]</span>
+    <span class="punct">}</span>
+  <span class="punct">}</span>
+<span class="punct">}</span></code></pre>
+      </div>
+
+      <div class="config-panel" id="tab-cursor">
+        <div class="file-path">.cursor/mcp.json</div>
+        <button class="copy-btn" data-copy='{
+  "mcpServers": {
+    "stm-montevideo": {
+      "command": "npx",
+      "args": ["-y", "mcp-stm-montevideo"]
+    }
+  }
+}'>Copy</button>
+        <pre><code><span class="punct">{</span>
+  <span class="key">"mcpServers"</span><span class="punct">:</span> <span class="punct">{</span>
+    <span class="key">"stm-montevideo"</span><span class="punct">:</span> <span class="punct">{</span>
+      <span class="key">"command"</span><span class="punct">:</span> <span class="string">"npx"</span><span class="punct">,</span>
+      <span class="key">"args"</span><span class="punct">:</span> <span class="punct">[</span><span class="string">"-y"</span><span class="punct">,</span> <span class="string">"mcp-stm-montevideo"</span><span class="punct">]</span>
+    <span class="punct">}</span>
+  <span class="punct">}</span>
+<span class="punct">}</span></code></pre>
+      </div>
+
+      <div class="config-panel" id="tab-claude-code">
+        <div class="file-path">.mcp.json (project root)</div>
+        <button class="copy-btn" data-copy='{
+  "mcpServers": {
+    "stm-montevideo": {
+      "command": "npx",
+      "args": ["-y", "mcp-stm-montevideo"]
+    }
+  }
+}'>Copy</button>
+        <pre><code><span class="punct">{</span>
+  <span class="key">"mcpServers"</span><span class="punct">:</span> <span class="punct">{</span>
+    <span class="key">"stm-montevideo"</span><span class="punct">:</span> <span class="punct">{</span>
+      <span class="key">"command"</span><span class="punct">:</span> <span class="string">"npx"</span><span class="punct">,</span>
+      <span class="key">"args"</span><span class="punct">:</span> <span class="punct">[</span><span class="string">"-y"</span><span class="punct">,</span> <span class="string">"mcp-stm-montevideo"</span><span class="punct">]</span>
+    <span class="punct">}</span>
+  <span class="punct">}</span>
+<span class="punct">}</span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== EXAMPLE ===== -->
+<section style="background:var(--bg-raised);">
+  <div class="container">
+    <div class="section-label">Example</div>
+    <h2 class="section-title">See it in action</h2>
+    <p class="section-desc">A realistic conversation between a user and an AI assistant using the STM tools.</p>
+
+    <div class="conversation">
+      <div class="msg msg-user">
+        <div class="msg-label">User</div>
+        <p>¿Cómo llego de Ciudad Vieja a Pocitos en ómnibus?</p>
+      </div>
+
+      <div class="msg msg-ai">
+        <div class="msg-label">Assistant</div>
+        <div class="tool-call">→ como_llegar(origen="Ciudad Vieja", destino="Pocitos")</div>
+        <p>Podés tomar la <strong>línea 121</strong> desde la parada <strong>Sarandí esq. Misiones</strong> (Ciudad Vieja). Bajás en <strong>Bv España esq. Joaquín Núñez</strong> (Pocitos).</p>
+        <p style="margin-top:8px;color:var(--text-dim);font-size:0.9rem;">Son unas 18 paradas, aproximadamente 25 minutos. El próximo sale en 8 min.</p>
+      </div>
+
+      <div class="msg msg-user">
+        <div class="msg-label">User</div>
+        <p>¿Y qué otras líneas pasan por esa parada?</p>
+      </div>
+
+      <div class="msg msg-ai">
+        <div class="msg-label">Assistant</div>
+        <div class="tool-call">→ proximos_buses(parada_id="2104")</div>
+        <p>Por la parada Sarandí esq. Misiones pasan las líneas: <strong>121, 116, 130, 142, 188, D10</strong>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer>
+  <div class="container footer-inner">
+    <div class="footer-links">
+      <a href="https://github.com/chaba11/mcp-stm-montevideo" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://www.npmjs.com/package/mcp-stm-montevideo" target="_blank" rel="noopener">npm</a>
+      <a href="https://chatgpt.com/g/g-69a70f5dc0288191a929b39ba8506973-stm-montevideo" target="_blank" rel="noopener">ChatGPT GPT</a>
+    </div>
+    <div class="footer-meta">
+      MIT License · Made in Montevideo 🇺🇾
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Tab switching
+  document.querySelectorAll('.config-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.config-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.config-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    });
+  });
+
+  // Copy to clipboard
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      navigator.clipboard.writeText(btn.dataset.copy).then(() => {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = 'Copy';
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    });
+  });
+</script>
+
+</body>
+</html>
