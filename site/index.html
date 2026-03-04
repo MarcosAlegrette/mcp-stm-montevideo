@@ -365,6 +365,53 @@
     color: #4caf50;
   }
 
+  /* ---- Optional tip ---- */
+  .optional-tip {
+    margin-top: 40px;
+    padding: 20px 24px;
+    background: rgba(42, 143, 212, 0.06);
+    border: 1px solid rgba(42, 143, 212, 0.15);
+    border-radius: 12px;
+    max-width: 600px;
+  }
+  .optional-tip .tip-title {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .optional-tip p {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    margin-bottom: 12px;
+  }
+  .optional-tip .tip-commands {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .optional-tip .tip-cmd {
+    background: var(--bg-card);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .optional-tip .tip-cmd code {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+  }
+  .optional-tip .tip-cmd .cmd-desc {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
   /* Tabs */
   .config-tabs {
     display: flex;
@@ -711,6 +758,43 @@
     <span class="punct">}</span>
   <span class="punct">}</span>
 <span class="punct">}</span></code></pre>
+      </div>
+    </div>
+
+    <div class="optional-tip">
+      <div class="tip-title">
+        <span class="lang-en">Optional: pre-download datasets</span>
+        <span class="lang-es">Opcional: pre-descargar datasets</span>
+      </div>
+      <p class="lang-en">The server downloads data on first use, which can take ~60s. If you clone the repo, you can pre-download datasets for faster cold starts:</p>
+      <p class="lang-es">El servidor descarga datos en el primer uso, lo que puede demorar ~60s. Si clonás el repo, podés pre-descargar los datasets para arranques más rápidos:</p>
+      <div class="tip-commands">
+        <div class="tip-cmd">
+          <div>
+            <code><span class="prefix">$</span> npm run build-stm-data</code>
+            <div class="cmd-desc">
+              <span class="lang-en">Schedules, stops &amp; routes from STM</span>
+              <span class="lang-es">Horarios, paradas y recorridos del STM</span>
+            </div>
+          </div>
+          <button class="copy-btn" data-copy="npm run build-stm-data">
+            <span class="lang-en">Copy</span>
+            <span class="lang-es">Copiar</span>
+          </button>
+        </div>
+        <div class="tip-cmd">
+          <div>
+            <code><span class="prefix">$</span> npm run build-geo-data</code>
+            <div class="cmd-desc">
+              <span class="lang-en">Offline geocoding data from OpenStreetMap</span>
+              <span class="lang-es">Datos de geocodificación offline de OpenStreetMap</span>
+            </div>
+          </div>
+          <button class="copy-btn" data-copy="npm run build-geo-data">
+            <span class="lang-en">Copy</span>
+            <span class="lang-es">Copiar</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
