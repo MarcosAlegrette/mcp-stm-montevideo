@@ -3,6 +3,7 @@ dist/
 .env
 *.Zone.Identifier
 .mcp.json
+DEPLOYMENT.md
 
 # Generated STM data (run npm run build-stm-data to regenerate)
 src/data/stm-paradas.json
