@@ -59,6 +59,7 @@ interface ParadaConDist extends Parada {
 const WALK_SPEED_MPM = 80; // meters per minute
 const MIN_PER_STOP = 2; // estimated minutes per bus stop
 const DEFAULT_TRANSFER_RADIUS = 300; // meters
+const TRANSFER_PENALTY_MIN = 5; // extra wait time per transfer
 
 // --- Input Schema ---
 const INPUT_SCHEMA = {
@@ -295,7 +296,7 @@ function findTransferRoutes(
 
       results.push({
         duracion_total_estimada_min:
-          walkToMin + ride1Min + transferWalkMin + ride2Min + walkFromMin,
+          walkToMin + ride1Min + transferWalkMin + TRANSFER_PENALTY_MIN + ride2Min + walkFromMin,
         tramos: [
           {
             tipo: "caminata",
@@ -406,7 +407,7 @@ export async function comoLlegarHandler(
     paradas,
     grid,
     max_caminata_metros,
-    30
+    50
   ) as ParadaConDist[];
 
   if (nearOrigin.length === 0) {
@@ -437,8 +438,16 @@ export async function comoLlegarHandler(
     );
   }
 
-  // Sort by duration and return top 3
-  allRoutes.sort((a, b) => a.duracion_total_estimada_min - b.duracion_total_estimada_min);
+  // Sort by duration, preferring fewer transfers when within 5 min
+  allRoutes.sort((a, b) => {
+    const durDiff = a.duracion_total_estimada_min - b.duracion_total_estimada_min;
+    if (Math.abs(durDiff) <= 5) {
+      const aTransfers = a.tramos.filter((t) => t.tipo === "bus").length - 1;
+      const bTransfers = b.tramos.filter((t) => t.tipo === "bus").length - 1;
+      if (aTransfers !== bTransfers) return aTransfers - bTransfers;
+    }
+    return durDiff;
+  });
   const top3 = allRoutes.slice(0, 3);
 
   return textResponse(JSON.stringify(top3, null, 2));

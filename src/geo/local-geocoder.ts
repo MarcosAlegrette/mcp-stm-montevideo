@@ -51,8 +51,11 @@ function findDataPath(): string | null {
   return null;
 }
 
-const PLACE_SCORE_THRESHOLD = 0.6;
+const PLACE_SCORE_THRESHOLD = 0.8;
 const MAX_INTERSECTION_DISTANCE_M = 30;
+
+// Bounding box for Montevideo department — reject POIs outside this area
+const MVD_BBOX = { minLat: -35.1, maxLat: -34.6, minLon: -56.6, maxLon: -55.9 };
 
 interface NormalizedPoi {
   poi: OsmPoi;
@@ -111,6 +114,17 @@ export class LocalGeocoder {
         bestScore = score;
         bestPoi = poi;
       }
+    }
+
+    // Reject POIs outside Montevideo
+    if (
+      bestPoi &&
+      (bestPoi.la < MVD_BBOX.minLat ||
+        bestPoi.la > MVD_BBOX.maxLat ||
+        bestPoi.lo < MVD_BBOX.minLon ||
+        bestPoi.lo > MVD_BBOX.maxLon)
+    ) {
+      bestPoi = null;
     }
 
     if (!bestPoi) return null;

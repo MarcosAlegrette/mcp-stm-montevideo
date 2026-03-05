@@ -345,7 +345,9 @@ describe("como_llegar — network fixture routing", () => {
       const parsed = JSON.parse(result.content[0].text) as RouteOption[];
       for (const route of parsed) {
         const summed = route.tramos.reduce((s, t) => s + t.duracion_min, 0);
-        expect(route.duracion_total_estimada_min).toBe(summed);
+        const busSegments = route.tramos.filter((t) => t.tipo === "bus").length;
+        const transfers = Math.max(0, busSegments - 1);
+        expect(route.duracion_total_estimada_min).toBe(summed + transfers * 5);
       }
     }
   });
@@ -495,6 +497,54 @@ describe("como_llegar — geocodePlace fallback", () => {
 
     intSpy.mockRestore();
     placeSpy.mockRestore();
+  });
+
+  it("direct route preferred over transfer route within 5 min duration", async () => {
+    // Line 999 goes directly from stop 10 to stop 23 (9 stops × 2 min = 18 min ride)
+    // Transfer: 181 (3 stops = 6 min) + walk + 121 (3 stops = 6 min) + penalty = ~17+ min
+    // With transfer penalty (5 min), transfer route is slower → direct should rank first
+    const result = await comoLlegarHandler(
+      {
+        origen_calle1: "ORIGEN ST",
+        destino_calle1: "DESTINO ST",
+        max_caminata_metros: 500,
+        max_transbordos: 1,
+      },
+      client
+    );
+    if (result.content[0].text.startsWith("[")) {
+      const parsed = JSON.parse(result.content[0].text) as RouteOption[];
+      expect(parsed.length).toBeGreaterThan(0);
+      const firstRoute = parsed[0];
+      const busSegments = firstRoute.tramos.filter((t) => t.tipo === "bus");
+      // First route should be direct (1 bus segment) since transfer penalty makes it competitive
+      expect(busSegments.length).toBe(1);
+    }
+  });
+
+  it("transfer routes include 5-min penalty in duration", async () => {
+    const result = await comoLlegarHandler(
+      {
+        origen_calle1: "ORIGEN ST",
+        destino_calle1: "DESTINO ST",
+        max_caminata_metros: 500,
+        max_transbordos: 1,
+      },
+      client
+    );
+    if (result.content[0].text.startsWith("[")) {
+      const parsed = JSON.parse(result.content[0].text) as RouteOption[];
+      for (const route of parsed) {
+        const busSegments = route.tramos.filter((t) => t.tipo === "bus");
+        if (busSegments.length > 1) {
+          // Transfer route: sum of tramo durations should be 5 min less than total
+          // because the penalty is added to total but not shown as a tramo
+          const sumTramos = route.tramos.reduce((s, t) => s + t.duracion_min, 0);
+          const transfers = busSegments.length - 1;
+          expect(route.duracion_total_estimada_min).toBe(sumTramos + transfers * 5);
+        }
+      }
+    }
   });
 
   it("returns not-found when geocodePlace also returns null", async () => {

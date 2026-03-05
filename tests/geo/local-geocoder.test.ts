@@ -154,6 +154,45 @@ describe("LocalGeocoder.searchPlace", () => {
     const result = makeGeocoder().searchPlace("Mcdonalds Pocitos");
     expect(result).not.toBeNull();
   });
+
+  it("rejects POI outside Montevideo bbox", () => {
+    const geocoder = new LocalGeocoder({
+      generatedAt: "2026-03-01T00:00:00.000Z",
+      pois: [
+        // Far outside Montevideo — lat -34.5 is north of MVD bbox maxLat -34.6
+        { n: "Intendencia de Pando", t: "office", la: -34.5, lo: -55.96 },
+      ],
+      streets: [],
+    });
+    const result = geocoder.searchPlace("Intendencia");
+    expect(result).toBeNull();
+  });
+
+  it("accepts POI inside Montevideo bbox", () => {
+    const geocoder = new LocalGeocoder({
+      generatedAt: "2026-03-01T00:00:00.000Z",
+      pois: [
+        { n: "Intendencia de Montevideo", t: "office", la: -34.9058, lo: -56.1882 },
+      ],
+      streets: [],
+    });
+    const result = geocoder.searchPlace("Intendencia Montevideo");
+    expect(result).not.toBeNull();
+    expect(result!.displayName).toBe("Intendencia de Montevideo");
+  });
+
+  it("rejects low-confidence partial match (score < 0.8)", () => {
+    // "Campeón del Siglo" vs "A los Campeones del '50" — only 2/3 tokens match = 0.67
+    const geocoder = new LocalGeocoder({
+      generatedAt: "2026-03-01T00:00:00.000Z",
+      pois: [
+        { n: "A los Campeones del '50", t: "monument", la: -34.893, lo: -56.153 },
+      ],
+      streets: [],
+    });
+    const result = geocoder.searchPlace("Campeón del Siglo");
+    expect(result).toBeNull();
+  });
 });
 
 // ─── searchIntersection ─────────────────────────────────────────────────────
