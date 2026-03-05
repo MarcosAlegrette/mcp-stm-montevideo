@@ -4,6 +4,8 @@
 
 **EN:** MCP server for Montevideo's Metropolitan Transit System (STM). Lets LLMs answer questions about bus schedules, routes, and stops in real time.
 
+**Landing:** [landing.stm.paltickets.uy](https://landing.stm.paltickets.uy) · **API:** [stm.paltickets.uy](https://stm.paltickets.uy)
+
 ---
 
 ## Instalación / Installation
@@ -79,6 +81,53 @@ En `.mcp.json` en la raíz de tu proyecto:
 
 ---
 
+## REST API
+
+El servidor expone una API REST además del protocolo MCP. Base URL: `https://stm.paltickets.uy`
+
+*The server exposes a REST API alongside the MCP protocol. Base URL: `https://stm.paltickets.uy`*
+
+| Endpoint | Método | Descripción |
+|----------|--------|-------------|
+| `/api/paradas/buscar` | GET | Buscar paradas cercanas / Search nearby stops |
+| `/api/buses/proximos` | GET | Próximos ómnibus en una parada / Next buses at a stop |
+| `/api/lineas/:numero/recorrido` | GET | Recorrido de una línea / Line route |
+| `/api/buses/:linea/ubicacion` | GET | Ubicación GPS de una línea / Line GPS location |
+| `/api/como-llegar` | POST | Calcular ruta entre dos puntos / Route between two points |
+| `/api/health` | GET | Estado del servidor / Server health |
+| `/api/docs` | GET | Swagger UI interactivo / Interactive Swagger UI |
+| `/api/openapi.yaml` | GET | Especificación OpenAPI 3.1 / OpenAPI 3.1 spec |
+
+---
+
+## MCP remoto / Remote MCP
+
+Endpoint: `https://stm.paltickets.uy/mcp` (Streamable HTTP, stateless)
+
+Para usar el MCP remoto en Claude Desktop o Claude.ai, usa `"url"` en vez de `"command"`:
+
+*To use remote MCP in Claude Desktop or Claude.ai, use `"url"` instead of `"command"`:*
+
+```json
+{
+  "mcpServers": {
+    "stm-montevideo": {
+      "url": "https://stm.paltickets.uy/mcp"
+    }
+  }
+}
+```
+
+---
+
+## ChatGPT Actions
+
+La API sirve como backend para GPTs de ChatGPT mediante Actions. Apunta a la especificación OpenAPI en `https://stm.paltickets.uy/api/openapi.yaml` al configurar el GPT.
+
+*The API serves as a backend for ChatGPT GPTs via Actions. Point to the OpenAPI spec at `https://stm.paltickets.uy/api/openapi.yaml` when configuring the GPT.*
+
+---
+
 ## Ejemplos de uso / Usage Examples
 
 **¿Cuándo pasa el próximo 181?**
@@ -136,6 +185,15 @@ npm install
 npm run build
 npm run test
 npm run lint
+```
+
+Para iniciar la REST API localmente:
+
+*To start the REST API locally:*
+
+```bash
+npm run start:api     # producción
+npm run dev:api       # desarrollo con hot reload
 ```
 
 Para ejecutar los tests de integración con datos reales (requiere internet):
