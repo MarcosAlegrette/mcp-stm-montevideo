@@ -68,5 +68,16 @@ export function findNearestParadasIndexed(
   }
 
   results.sort((a, b) => a.distancia_metros - b.distancia_metros);
-  return results.slice(0, maxResults);
+
+  // Deduplicate by stop ID — keep closest entry per physical stop
+  const seenIds = new Set<number>();
+  const deduped: ParadaConDistancia[] = [];
+  for (const r of results) {
+    if (!seenIds.has(r.id)) {
+      seenIds.add(r.id);
+      deduped.push(r);
+    }
+  }
+
+  return deduped.slice(0, maxResults);
 }

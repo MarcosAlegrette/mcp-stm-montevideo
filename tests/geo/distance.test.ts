@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { getDistance } from "geolib";
-import { findNearestParadas, fastDistMeters } from "../../src/geo/distance.js";
+import { findNearestParadas, findNearestParadasIndexed, fastDistMeters } from "../../src/geo/distance.js";
+import { buildSpatialGrid } from "../../src/geo/spatial-grid.js";
 import { PARADAS_GEO } from "../fixtures/paradas-geo.js";
 import type { Parada } from "../../src/types/parada.js";
 
@@ -129,6 +130,78 @@ describe("findNearestParadas", () => {
     expect(typeof r.id).toBe("number");
     expect(typeof r.linea).toBe("string");
     expect(typeof r.distancia_metros).toBe("number");
+  });
+});
+
+describe("findNearestParadasIndexed deduplication", () => {
+  it("deduplicates by stop ID, keeping closest entry", () => {
+    // Same physical stop (id=1) appears 3 times with different variants
+    const paradas: Parada[] = [
+      makeParada(1, -34.8940, -56.1680, "AV ITALIA"),  // farther
+      makeParada(1, -34.8938, -56.1676, "AV ITALIA"),  // middle
+      makeParada(1, -34.8937, -56.1675, "AV ITALIA"),  // closest
+      makeParada(2, -34.8939, -56.1678, "BV ARTIGAS"), // different stop
+    ];
+    // Override variante to simulate different variants for same stop
+    paradas[0].variante = 10;
+    paradas[1].variante = 20;
+    paradas[2].variante = 30;
+    paradas[3].variante = 40;
+
+    const grid = buildSpatialGrid(
+      paradas.map((p) => ({ lat: p.lat, lng: p.lng })),
+      0.01
+    );
+
+    const results = findNearestParadasIndexed(
+      TRES_CRUCES.lat,
+      TRES_CRUCES.lon,
+      paradas,
+      grid,
+      500,
+      10
+    );
+
+    // Should only have 2 unique stop IDs (1 and 2), not 4 rows
+    const ids = results.map((r) => r.id);
+    expect(ids).toHaveLength(2);
+    expect(ids).toContain(1);
+    expect(ids).toContain(2);
+
+    // The entry for id=1 should be the closest one (variante=30)
+    const stop1 = results.find((r) => r.id === 1)!;
+    expect(stop1.variante).toBe(30);
+  });
+
+  it("maxResults applies after deduplication", () => {
+    // 5 unique stops, each duplicated 3 times = 15 rows
+    const paradas: Parada[] = [];
+    for (let id = 1; id <= 5; id++) {
+      for (let v = 1; v <= 3; v++) {
+        const p = makeParada(id, -34.893 - id * 0.0001, -56.167 - id * 0.0001, `CALLE ${id}`);
+        p.variante = v;
+        paradas.push(p);
+      }
+    }
+
+    const grid = buildSpatialGrid(
+      paradas.map((p) => ({ lat: p.lat, lng: p.lng })),
+      0.01
+    );
+
+    const results = findNearestParadasIndexed(
+      TRES_CRUCES.lat,
+      TRES_CRUCES.lon,
+      paradas,
+      grid,
+      5000,
+      3
+    );
+
+    // maxResults=3 should return 3 unique stops, not 3 rows (which would be 1 stop with 3 variants)
+    const uniqueIds = new Set(results.map((r) => r.id));
+    expect(uniqueIds.size).toBe(3);
+    expect(results).toHaveLength(3);
   });
 });
 
