@@ -7,6 +7,7 @@ import { readFileSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { normalizeText } from "./search.js";
+import { log } from "../utils/log.js";
 import type { GeoPoint, GeoPlace } from "./geocode.js";
 
 interface OsmPoi {
@@ -224,7 +225,7 @@ export function getLocalGeocoder(): LocalGeocoder {
 
   const dataPath = findDataPath();
   if (!dataPath) {
-    console.warn(
+    log.warn(
       "[LocalGeocoder] Data file not found. Run: npm run build-geo-data\n" +
         "  Falling back to Nominatim for all geocoding."
     );
@@ -235,12 +236,12 @@ export function getLocalGeocoder(): LocalGeocoder {
   try {
     const raw = readFileSync(dataPath, "utf8");
     const data = JSON.parse(raw) as GeocoderData;
-    console.error(
+    log.error(
       `[LocalGeocoder] Loaded ${data.pois.length} POIs, ${data.streets.length} streets (${dataPath})`
     );
     _instance = new LocalGeocoder(data);
   } catch (err) {
-    console.warn(`[LocalGeocoder] Failed to load data: ${err}. Falling back to Nominatim.`);
+    log.warn(`[LocalGeocoder] Failed to load data: ${err}. Falling back to Nominatim.`);
     _instance = new LocalGeocoder(null);
   }
 

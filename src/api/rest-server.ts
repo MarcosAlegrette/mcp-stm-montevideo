@@ -16,6 +16,7 @@ import { comoLlegarHandler } from "../tools/como-llegar.js";
 import { getOpenApiSpec } from "./openapi.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { createServer } from "../server.js";
+import { log } from "../utils/log.js";
 
 // Read package.json version at import time
 import { readFileSync } from "node:fs";
@@ -98,7 +99,7 @@ export function createRestApp(
     const start = Date.now();
     await next();
     const ms = Date.now() - start;
-    console.log(`${c.req.method} ${c.req.path} ${c.res.status} ${ms}ms`);
+    log.info(`${c.req.method} ${c.req.path} ${c.res.status} ${ms}ms`);
   });
 
   // --- OAuth discovery (RFC 9728) ---
