@@ -8,16 +8,21 @@ import { buscarParadaHandler } from "../../src/tools/buscar-parada.js";
 import { recorridoLineaHandler } from "../../src/tools/recorrido-linea.js";
 import { proximosBusesHandler } from "../../src/tools/proximos-buses.js";
 import { comoLlegarHandler } from "../../src/tools/como-llegar.js";
+import { findNearestParadasIndexed } from "../../src/geo/distance.js";
+import { getDataIndexes } from "../../src/data/data-indexes.js";
+import { geocodeIntersection } from "../../src/geo/geocode.js";
+import type { Parada } from "../../src/data/ckan-client.js";
 
 const SKIP = process.env["SKIP_INTEGRATION"] !== "false";
 
 describe.skipIf(SKIP)("Tools live integration", () => {
   let client: CkanClient;
+  let paradas: Parada[];
 
   beforeAll(async () => {
     client = new CkanClient();
     // Pre-warm cache
-    await client.getParadas();
+    paradas = await client.getParadas();
   }, 120_000);
 
   it("buscar_parada returns results for 18 de Julio y Ejido", async () => {
@@ -122,4 +127,99 @@ describe.skipIf(SKIP)("Tools live integration", () => {
       expect(parsed[0].duracion_total_estimada_min).toBeGreaterThan(0);
     }
   }, 120_000);
+
+  // --- New tests: routing quality ---
+
+  it("como_llegar finds a direct route from Facultad de Ingeniería to Intendencia", async () => {
+    const result = await comoLlegarHandler(
+      {
+        origen_calle1: "Facultad de Ingeniería",
+        destino_calle1: "Intendencia de Montevideo",
+      },
+      client
+    );
+    const text = result.content[0].text;
+    expect(text.length).toBeGreaterThan(0);
+    if (text.startsWith("[")) {
+      const routes = JSON.parse(text) as Array<{
+        tramos: Array<{ tipo: string; linea?: string }>;
+      }>;
+      // At least 1 direct route (exactly 1 bus tramo)
+      const directRoutes = routes.filter(
+        (r) => r.tramos.filter((t) => t.tipo === "bus").length === 1
+      );
+      expect(directRoutes.length).toBeGreaterThan(0);
+    }
+  }, 120_000);
+
+  it("como_llegar finds a direct route from Intendencia to Campeón del Siglo", async () => {
+    const result = await comoLlegarHandler(
+      {
+        origen_calle1: "Intendencia de Montevideo",
+        destino_calle1: "Campeón del Siglo",
+        max_caminata_metros: 1500,
+        max_transbordos: 1,
+      },
+      client
+    );
+    const text = result.content[0].text;
+    expect(text.length).toBeGreaterThan(0);
+    if (text.startsWith("[")) {
+      const routes = JSON.parse(text) as Array<{
+        tramos: Array<{ tipo: string; linea?: string }>;
+      }>;
+      expect(routes.length).toBeGreaterThan(0);
+      // Check that at least one route uses line 103 or D8
+      const allBusLines = routes.flatMap((r) =>
+        r.tramos.filter((t) => t.tipo === "bus").map((t) => t.linea)
+      );
+      const hasExpectedLine = allBusLines.some(
+        (l) => l === "103" || l === "D8"
+      );
+      expect(hasExpectedLine).toBe(true);
+    }
+  }, 120_000);
+
+  // --- Dedup verification ---
+
+  it("findNearestParadasIndexed returns unique stop IDs near 18 de Julio & Ejido", async () => {
+    const indexes = getDataIndexes();
+    const grid = indexes.getParadasGrid(paradas);
+    const ejido = await geocodeIntersection("18 de Julio", "Ejido", paradas);
+    expect(ejido).not.toBeNull();
+    if (!ejido) return;
+
+    const near = findNearestParadasIndexed(ejido.lat, ejido.lon, paradas, grid, 800, 20);
+    expect(near.length).toBeGreaterThan(0);
+
+    // All returned rows must have unique stop IDs (dedup working)
+    const ids = near.map((p) => p.id);
+    const uniqueIds = new Set(ids);
+    expect(uniqueIds.size).toBe(near.length);
+  }, 60_000);
+
+  // --- buscar_parada: fuzzy name search ---
+
+  it("buscar_parada returns results for fuzzy search 'tres cruces'", async () => {
+    const result = await buscarParadaHandler(
+      { calle1: "tres cruces" },
+      client
+    );
+    const text = result.content[0].text;
+    expect(text.length).toBeGreaterThan(0);
+    if (text.startsWith("[")) {
+      const parsed = JSON.parse(text);
+      expect(parsed.length).toBeGreaterThan(0);
+    }
+  }, 60_000);
+
+  // --- recorrido_linea: unknown line ---
+
+  it("recorrido_linea returns helpful message for unknown line 9999", async () => {
+    const result = await recorridoLineaHandler({ linea: "9999" }, client);
+    const text = result.content[0].text;
+    expect(text.length).toBeGreaterThan(0);
+    // Should NOT be a JSON array (no results), should be a user-friendly message
+    expect(text.startsWith("[")).toBe(false);
+  }, 60_000);
 });
