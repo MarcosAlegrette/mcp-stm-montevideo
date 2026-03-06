@@ -90,11 +90,13 @@ export const LINEAS_FIXTURE: LineaVariante[] = [
 
 // --- Paradas ---
 export const PARADAS_FIXTURE: Parada[] = [
+  // Line 181 variant 5200: 3 stops, ~700m apart each
   { id: 300, linea: "181", variante: 5200, ordinal: 1, calle: "BV ESPAÑA", esquina: "LIBERTAD", lat: -34.9145, lng: -56.1505 },
-  { id: 301, linea: "181", variante: 5200, ordinal: 2, calle: "18 DE JULIO", esquina: "EJIDO", lat: -34.9060, lng: -56.1880 },
-  { id: 302, linea: "181", variante: 5200, ordinal: 3, calle: "AV ITALIA", esquina: "GARIBALDI", lat: -34.8937, lng: -56.1675 },
+  { id: 301, linea: "181", variante: 5200, ordinal: 2, calle: "18 DE JULIO", esquina: "EJIDO", lat: -34.9100, lng: -56.1560 },
+  { id: 302, linea: "181", variante: 5200, ordinal: 3, calle: "AV ITALIA", esquina: "GARIBALDI", lat: -34.9055, lng: -56.1615 },
+  // Line D10 variant 5300: 2 stops, ~900m apart
   { id: 303, linea: "D10", variante: 5300, ordinal: 1, calle: "AV AGRACIADA", esquina: "CAPURRO", lat: -34.8870, lng: -56.1920 },
-  { id: 304, linea: "D10", variante: 5300, ordinal: 2, calle: "COLONIA", esquina: "YAGUARON", lat: -34.9025, lng: -56.1815 },
+  { id: 304, linea: "D10", variante: 5300, ordinal: 2, calle: "COLONIA", esquina: "YAGUARON", lat: -34.8940, lng: -56.1880 },
 ];
 
 // --- Helper to build horarios ---

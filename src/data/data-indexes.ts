@@ -8,6 +8,45 @@ import type { HorarioRow } from "../types/horario.js";
 import type { LineaVariante } from "../types/linea.js";
 import { buildSpatialGrid, type SpatialGrid } from "../geo/spatial-grid.js";
 import { normalizeText } from "../geo/search.js";
+import { fastDistMeters } from "../geo/distance.js";
+import { log } from "../utils/log.js";
+
+export const MAX_CONSECUTIVE_GAP_M = 2000;
+export const MIN_STOPS_PER_VARIANT = 2;
+
+/**
+ * Remove variants with unrealistic gaps between consecutive stops.
+ * Mutates the map in place. Returns count of removed variants.
+ */
+export function filterSuspiciousVariants(
+  map: Map<number, Parada[]>,
+  maxGapMeters = MAX_CONSECUTIVE_GAP_M,
+  minStops = MIN_STOPS_PER_VARIANT
+): number {
+  let removed = 0;
+  for (const [codVariante, stops] of map) {
+    if (stops.length < minStops) {
+      log.warn(`Variant ${codVariante}: removed (only ${stops.length} stop(s))`);
+      map.delete(codVariante);
+      removed++;
+      continue;
+    }
+    let suspicious = false;
+    for (let i = 1; i < stops.length; i++) {
+      const gap = fastDistMeters(stops[i - 1].lat, stops[i - 1].lng, stops[i].lat, stops[i].lng);
+      if (gap > maxGapMeters) {
+        log.warn(`Variant ${codVariante} (${stops[0].linea}): ${Math.round(gap)}m gap between stops ${stops[i - 1].id}→${stops[i].id}, removed`);
+        suspicious = true;
+        break;
+      }
+    }
+    if (suspicious) {
+      map.delete(codVariante);
+      removed++;
+    }
+  }
+  return removed;
+}
 
 // --- Normalized parada fields ---
 export interface NormalizedParadaFields {
@@ -93,6 +132,7 @@ class DataIndexes {
     for (const stops of map.values()) {
       stops.sort((a, b) => a.ordinal - b.ordinal);
     }
+    filterSuspiciousVariants(map);
     this._paradasByVariante = map;
   }
 

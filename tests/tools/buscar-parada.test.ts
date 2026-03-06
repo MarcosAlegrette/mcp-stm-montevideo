@@ -436,7 +436,7 @@ describe("buscar_parada — edge cases and radius tests", () => {
   it("very large radius returns results without crash", async () => {
     const client = makeFixtureClient();
     const result = await buscarParadaHandler(
-      { latitud: -34.9060, longitud: -56.188, radio_metros: 50000 },
+      { latitud: -34.9100, longitud: -56.1560, radio_metros: 50000 },
       client
     );
     // Should return results — all paradas in Montevideo are within 50km of center

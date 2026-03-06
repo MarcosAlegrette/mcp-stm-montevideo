@@ -36,8 +36,10 @@ const PARADAS_ROUTE: Parada[] = [
   { id: 21, linea: "121", variante: 5201, ordinal: 2, calle: "DEST MID 1", esquina: "", lat: -34.920, lng: -56.160 },
   { id: 22, linea: "121", variante: 5201, ordinal: 3, calle: "DEST MID 2", esquina: "", lat: -34.925, lng: -56.155 },
   { id: 23, linea: "121", variante: 5201, ordinal: 4, calle: "DESTINO ST", esquina: "FINAL AVE", lat: -34.930, lng: -56.150 },
-  // Direct line: Line 999 goes from stop 10 directly to stop 23
+  // Direct line: Line 999 goes from stop 10 to stop 23 with intermediate stops
   { id: 10, linea: "999", variante: 5999, ordinal: 1, calle: "ORIGEN ST", esquina: "CALLE A", lat: -34.900, lng: -56.180 },
+  { id: 30, linea: "999", variante: 5999, ordinal: 4, calle: "999 MID 1", esquina: "", lat: -34.910, lng: -56.170 },
+  { id: 31, linea: "999", variante: 5999, ordinal: 7, calle: "999 MID 2", esquina: "", lat: -34.920, lng: -56.160 },
   { id: 23, linea: "999", variante: 5999, ordinal: 10, calle: "DESTINO ST", esquina: "FINAL AVE", lat: -34.930, lng: -56.150 },
 ];
 

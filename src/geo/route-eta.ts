@@ -16,6 +16,7 @@ import {
   type SegmentTimeTable,
 } from "./segment-times.js";
 import { buildSpatialGrid, getCandidates } from "./spatial-grid.js";
+import { filterSuspiciousVariants } from "../data/data-indexes.js";
 
 export interface GpsEstimatedBus {
   id_vehiculo: string;
@@ -80,6 +81,7 @@ export function estimateEtaFromPositions(
   for (const arr of paradasByVariante.values()) {
     arr.sort((a, b) => a.ordinal - b.ordinal);
   }
+  filterSuspiciousVariants(paradasByVariante);
 
   // Build spatial grids per variant for fast closest-stop lookup
   const gridsPerVariante = new Map<number, ReturnType<typeof buildSpatialGrid>>();

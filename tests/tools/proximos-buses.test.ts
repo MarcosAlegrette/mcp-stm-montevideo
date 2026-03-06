@@ -805,9 +805,8 @@ describe("proximos_buses — GPS-estimated ETA fallback", () => {
     const client = createMockClient();
     const now = new Date("2026-02-25T13:00:00Z"); // 10:00 MVD
 
-    // Bus at parada 300 (ordinal 1), target is also 300 → won't work
-    // Bus near parada 300's coords but route goes 300→301→302
-    // Place bus between stop 300 and 301 (before 301)
+    // Bus near stop 300 coords, route goes 300→301→302
+    // Place bus near stop 300 (ordinal 1), target is stop 302 (ordinal 3)
     const gps = makeMockGpsWithPositions(
       { available: true, buses: [] }, // upcomingBuses empty
       {
@@ -815,8 +814,8 @@ describe("proximos_buses — GPS-estimated ETA fallback", () => {
         positions: [
           {
             id_vehiculo: "V-100",
-            latitud: -34.9100, // between stop 300 (-34.9145) and 301 (-34.9060)
-            longitud: -56.1700,
+            latitud: -34.9140, // near stop 300 (-34.9145, -56.1505)
+            longitud: -56.1510,
             velocidad: 25,
             cod_variante: 5200,
             destino: "TRES CRUCES",
