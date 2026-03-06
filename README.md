@@ -11,7 +11,7 @@
 ## Instalación / Installation
 
 ```bash
-npx mcp-stm-montevideo
+npx mcp-stm-montevideo@latest
 ```
 
 Los datos se descargan automáticamente desde los datos abiertos de la Intendencia de Montevideo (CKAN). La primera ejecución tarda ~60s mientras descarga y cachea en disco (`~/.cache/mcp-stm-montevideo/`). Las ejecuciones siguientes cargan desde el caché en ~2s. El servidor pre-carga los datos al iniciar para que la primera consulta sea instantánea.
@@ -31,7 +31,7 @@ Agrega esto a `~/Library/Application Support/Claude/claude_desktop_config.json` 
   "mcpServers": {
     "stm-montevideo": {
       "command": "npx",
-      "args": ["-y", "mcp-stm-montevideo"]
+      "args": ["-y", "mcp-stm-montevideo@latest"]
     }
   }
 }
@@ -46,7 +46,7 @@ En `.cursor/mcp.json`:
   "mcpServers": {
     "stm-montevideo": {
       "command": "npx",
-      "args": ["-y", "mcp-stm-montevideo"]
+      "args": ["-y", "mcp-stm-montevideo@latest"]
     }
   }
 }
@@ -61,7 +61,7 @@ En `.mcp.json` en la raíz de tu proyecto:
   "mcpServers": {
     "stm-montevideo": {
       "command": "npx",
-      "args": ["-y", "mcp-stm-montevideo"]
+      "args": ["-y", "mcp-stm-montevideo@latest"]
     }
   }
 }
