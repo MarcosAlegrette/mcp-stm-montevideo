@@ -11,11 +11,23 @@ import { normalizeText } from "../geo/search.js";
 import { fastDistMeters } from "../geo/distance.js";
 import { log } from "../utils/log.js";
 
-export const MAX_CONSECUTIVE_GAP_M = 2000;
+export const MAX_CONSECUTIVE_GAP_M = 2500;
 export const MIN_STOPS_PER_VARIANT = 2;
+export const GHOST_STOP_IDS = new Set([6806]);
+export const BLOCKED_LINE_PREFIXES = ["BT"];
+export const BLOCKED_LINE_NAMES = ["M-A"];
+
+function isBlockedLine(linea: string): boolean {
+  if (BLOCKED_LINE_NAMES.includes(linea)) return true;
+  return BLOCKED_LINE_PREFIXES.some((prefix) => linea.startsWith(prefix));
+}
 
 /**
- * Remove variants with unrealistic gaps between consecutive stops.
+ * Filter variants through multiple phases:
+ * Phase 0: Remove ghost stops. If a variant's first stop was ghost → remove entire variant.
+ * Phase 1: Remove variants by line name blocklist (BT*, M-A).
+ * Phase 2: Remove variants with <2 stops.
+ * Phase 3: Remove variants with consecutive gap >2500m (exempt SD lines).
  * Mutates the map in place. Returns count of removed variants.
  */
 export function filterSuspiciousVariants(
@@ -24,18 +36,51 @@ export function filterSuspiciousVariants(
   minStops = MIN_STOPS_PER_VARIANT
 ): number {
   let removed = 0;
+
+  // Phase 0: Ghost stops
+  for (const [codVariante, stops] of map) {
+    if (stops.length > 0 && GHOST_STOP_IDS.has(stops[0].id)) {
+      log.warn(`Variant ${codVariante} (${stops[0].linea}): removed (origin is ghost stop ${stops[0].id})`);
+      map.delete(codVariante);
+      removed++;
+      continue;
+    }
+    // Remove ghost stops from mid-route
+    const filtered = stops.filter((s) => !GHOST_STOP_IDS.has(s.id));
+    if (filtered.length !== stops.length) {
+      log.warn(`Variant ${codVariante}: removed ${stops.length - filtered.length} ghost stop(s)`);
+      map.set(codVariante, filtered);
+    }
+  }
+
+  // Phase 1: Line name blocklist
+  for (const [codVariante, stops] of map) {
+    if (stops.length > 0 && isBlockedLine(stops[0].linea)) {
+      log.warn(`Variant ${codVariante} (${stops[0].linea}): removed (blocked line)`);
+      map.delete(codVariante);
+      removed++;
+    }
+  }
+
+  // Phase 2: Too few stops
   for (const [codVariante, stops] of map) {
     if (stops.length < minStops) {
       log.warn(`Variant ${codVariante}: removed (only ${stops.length} stop(s))`);
       map.delete(codVariante);
       removed++;
-      continue;
     }
+  }
+
+  // Phase 3: Consecutive gap filter (exempt SD lines)
+  for (const [codVariante, stops] of map) {
+    const linea = stops[0]?.linea ?? "";
+    if (linea.includes("SD")) continue; // semidirecto — legitimately skips stops
+
     let suspicious = false;
     for (let i = 1; i < stops.length; i++) {
       const gap = fastDistMeters(stops[i - 1].lat, stops[i - 1].lng, stops[i].lat, stops[i].lng);
       if (gap > maxGapMeters) {
-        log.warn(`Variant ${codVariante} (${stops[0].linea}): ${Math.round(gap)}m gap between stops ${stops[i - 1].id}→${stops[i].id}, removed`);
+        log.warn(`Variant ${codVariante} (${linea}): ${Math.round(gap)}m gap between stops ${stops[i - 1].id}→${stops[i].id}, removed`);
         suspicious = true;
         break;
       }
@@ -45,6 +90,7 @@ export function filterSuspiciousVariants(
       removed++;
     }
   }
+
   return removed;
 }
 
