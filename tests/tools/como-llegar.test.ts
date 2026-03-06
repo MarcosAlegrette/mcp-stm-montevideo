@@ -562,4 +562,53 @@ describe("como_llegar — geocodePlace fallback", () => {
     expect(result.content[0].text).toMatch(/No se encontró el origen/);
     spy.mockRestore();
   });
+
+  it("extracts door number and uses geocodeAddress for origin", async () => {
+    // Mock geocodeAddress to return a point near stop 10 (ORIGEN ST)
+    const addrSpy = vi.spyOn(geocodeModule, "geocodeAddress").mockResolvedValue({
+      lat: -34.900,
+      lon: -56.180,
+    });
+
+    const result = await comoLlegarHandler(
+      {
+        origen_calle1: "ORIGEN ST 1124",
+        destino_calle1: "DESTINO ST",
+        max_caminata_metros: 800,
+      },
+      client
+    );
+
+    // geocodeAddress should have been called with the street name and door number
+    expect(addrSpy).toHaveBeenCalledWith("ORIGEN ST", "1124");
+    // Should find a route (not an error)
+    const text = result.content[0].text;
+    expect(text).not.toMatch(/No se encontró/);
+    const parsed = JSON.parse(text);
+    expect(parsed.length).toBeGreaterThan(0);
+    addrSpy.mockRestore();
+  });
+
+  it("falls back to fuzzy search with street-only when geocodeAddress fails", async () => {
+    // Mock geocodeAddress to fail
+    const addrSpy = vi.spyOn(geocodeModule, "geocodeAddress").mockResolvedValue(null);
+
+    const result = await comoLlegarHandler(
+      {
+        origen_calle1: "ORIGEN ST 999",
+        destino_calle1: "DESTINO ST",
+        max_caminata_metros: 800,
+      },
+      client
+    );
+
+    // geocodeAddress was tried but failed
+    expect(addrSpy).toHaveBeenCalled();
+    // Fuzzy search on "ORIGEN ST" (without number) should still find the stop
+    const text = result.content[0].text;
+    expect(text).not.toMatch(/No se encontró/);
+    const parsed = JSON.parse(text);
+    expect(parsed.length).toBeGreaterThan(0);
+    addrSpy.mockRestore();
+  });
 });

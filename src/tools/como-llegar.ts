@@ -4,8 +4,9 @@ import type { CkanClient } from "../data/ckan-client.js";
 import { findNearestParadasIndexed, fastDistMeters } from "../geo/distance.js";
 import { getDataIndexes } from "../data/data-indexes.js";
 import { buildSpatialGrid, getCandidates } from "../geo/spatial-grid.js";
-import { geocodeIntersection, geocodePlace } from "../geo/geocode.js";
+import { geocodeIntersection, geocodePlace, geocodeAddress } from "../geo/geocode.js";
 import { fuzzySearchParadas } from "../geo/search.js";
+import { extractAddressNumber } from "./buscar-parada.js";
 import type { Parada } from "../types/parada.js";
 
 // --- Types ---
@@ -100,8 +101,19 @@ async function resolveLocation(
     const intersection = await geocodeIntersection(calle1, calle2, paradas);
     if (intersection) return intersection;
   }
-  // Try fuzzy stop name search
-  const matches = fuzzySearchParadas(calle1, paradas);
+
+  // Extract door number and use structured geocoding
+  const addressMatch = extractAddressNumber(calle1);
+  if (addressMatch) {
+    try {
+      const point = await geocodeAddress(addressMatch.calle, addressMatch.numero);
+      if (point) return { lat: point.lat, lon: point.lon };
+    } catch { /* fall through to fuzzy search */ }
+  }
+
+  // Fuzzy search — use street name only if door number was extracted
+  const searchQuery = addressMatch ? addressMatch.calle : calle1;
+  const matches = fuzzySearchParadas(searchQuery, paradas);
   if (matches.length > 0) return { lat: matches[0].lat, lon: matches[0].lng };
   // Fallback: geocode as place/landmark (LocalGeocoder + Nominatim)
   const place = await geocodePlace(calle2 ? `${calle1} ${calle2}` : calle1);
