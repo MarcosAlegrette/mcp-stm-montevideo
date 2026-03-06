@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { log } from "../utils/log.js";
 
 interface DiskCacheMeta {
   savedAt: number;
@@ -21,10 +22,16 @@ export function getCacheDir(): string {
 
 /**
  * Write data to the disk cache with a metadata sidecar file.
+ * If minLength is set and data is an array shorter than that, the write is
+ * skipped to prevent poisoning the cache with partial/test data.
  * Silently fails on any I/O error.
  */
-export function writeDiskCache(filename: string, data: unknown): void {
+export function writeDiskCache(filename: string, data: unknown, minLength?: number): void {
   try {
+    if (minLength != null && Array.isArray(data) && data.length < minLength) {
+      log.warn(`Disk cache: refusing to write ${filename} — only ${data.length} rows (min ${minLength})`);
+      return;
+    }
     const dir = getCacheDir();
     const dataPath = join(dir, filename);
     const metaPath = join(dir, filename.replace(/\.json$/, ".meta.json"));
@@ -38,9 +45,11 @@ export function writeDiskCache(filename: string, data: unknown): void {
 
 /**
  * Read data from the disk cache if it exists and hasn't expired.
- * Returns null if missing, expired, or unreadable.
+ * If minLength is set and the parsed data is an array shorter than that,
+ * the cache entry is treated as poisoned and discarded.
+ * Returns null if missing, expired, poisoned, or unreadable.
  */
-export function readDiskCache<T>(filename: string, ttlMs: number): T | null {
+export function readDiskCache<T>(filename: string, ttlMs: number, minLength?: number): T | null {
   try {
     const dir = getCacheDir();
     const dataPath = join(dir, filename);
@@ -54,7 +63,14 @@ export function readDiskCache<T>(filename: string, ttlMs: number): T | null {
     if (meta.savedAt + ttlMs < Date.now()) return null;
 
     const dataRaw = readFileSync(dataPath, "utf-8");
-    return JSON.parse(dataRaw) as T;
+    const parsed = JSON.parse(dataRaw) as T;
+
+    if (minLength != null && Array.isArray(parsed) && parsed.length < minLength) {
+      log.warn(`Disk cache: discarding ${filename} — only ${parsed.length} rows (min ${minLength})`);
+      return null;
+    }
+
+    return parsed;
   } catch {
     return null;
   }

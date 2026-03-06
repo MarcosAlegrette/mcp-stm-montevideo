@@ -100,6 +100,43 @@ describe("writeDiskCache + readDiskCache", () => {
   });
 });
 
+describe("minLength validation", () => {
+  it("writeDiskCache skips write when array is too short", () => {
+    const data = [{ id: 1 }, { id: 2 }];
+    writeDiskCache("too-small.json", data, 100);
+    const result = readDiskCache("too-small.json", 60_000);
+    expect(result).toBeNull();
+  });
+
+  it("writeDiskCache writes when array meets minimum", () => {
+    const data = Array.from({ length: 100 }, (_, i) => ({ id: i }));
+    writeDiskCache("big-enough.json", data, 100);
+    const result = readDiskCache<typeof data>("big-enough.json", 60_000);
+    expect(result).toHaveLength(100);
+  });
+
+  it("readDiskCache discards poisoned cache below minLength", () => {
+    // Write without minLength (simulating old code or direct poisoning)
+    writeDiskCache("poisoned.json", [{ id: 1 }]);
+    // Read with minLength — should discard
+    const result = readDiskCache("poisoned.json", 60_000, 100);
+    expect(result).toBeNull();
+  });
+
+  it("readDiskCache returns data when above minLength", () => {
+    const data = Array.from({ length: 50 }, (_, i) => ({ id: i }));
+    writeDiskCache("ok-size.json", data);
+    const result = readDiskCache<typeof data>("ok-size.json", 60_000, 10);
+    expect(result).toHaveLength(50);
+  });
+
+  it("minLength is ignored for non-array data", () => {
+    writeDiskCache("object.json", { key: "value" }, 100);
+    const result = readDiskCache("object.json", 60_000, 100);
+    expect(result).toEqual({ key: "value" });
+  });
+});
+
 describe("error handling", () => {
   it("writeDiskCache silently fails on invalid dir", () => {
     const saved = process.env.XDG_CACHE_HOME;

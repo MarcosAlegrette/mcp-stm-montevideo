@@ -17,6 +17,11 @@ const CKAN_BASE = "https://ckan.montevideo.gub.uy/api/3/action";
 const TTL_1M = 30 * 24 * 60 * 60 * 1000; // 1 month
 const DISK_TTL_6M = 180 * 24 * 60 * 60 * 1000; // 6 months — CKAN dataset last updated 2023
 
+// Minimum row counts to prevent poisoned cache (real dataset has ~42K paradas, ~2.5M horarios, ~350 lineas)
+const MIN_PARADAS = 1000;
+const MIN_HORARIOS = 10000;
+const MIN_LINEAS = 50;
+
 // Timeouts
 const METADATA_TIMEOUT_MS = 15_000; // 15s for package_show
 const ZIP_GENERATION_TIMEOUT_MS = 90_000; // 90s for generar_zip2 (generates on demand)
@@ -251,7 +256,7 @@ export class CkanClient {
     }
 
     if (!this.skipDiskCache) {
-      const diskData = readDiskCache<Parada[]>("stm-paradas.json", DISK_TTL_6M);
+      const diskData = readDiskCache<Parada[]>("stm-paradas.json", DISK_TTL_6M, MIN_PARADAS);
       if (diskData) {
         this.cache.set(cacheKey, diskData, TTL_1M);
         return diskData;
@@ -278,7 +283,7 @@ export class CkanClient {
       });
 
       this.cache.set(cacheKey, paradas, TTL_1M);
-      writeDiskCache("stm-paradas.json", paradas);
+      writeDiskCache("stm-paradas.json", paradas, MIN_PARADAS);
       return paradas;
     });
   }
@@ -302,7 +307,7 @@ export class CkanClient {
     }
 
     if (!this.skipDiskCache) {
-      const diskData = readDiskCache<unknown[]>("stm-horarios.json", DISK_TTL_6M);
+      const diskData = readDiskCache<unknown[]>("stm-horarios.json", DISK_TTL_6M, MIN_HORARIOS);
       if (diskData) {
         const rows = hydrateHorarioTuples(diskData);
         this.cache.set(cacheKey, rows, TTL_1M);
@@ -327,7 +332,7 @@ export class CkanClient {
       }) as HorarioRow[];
 
       this.cache.set(cacheKey, rows, TTL_1M);
-      writeDiskCache("stm-horarios.json", compactHorarioRows(rows));
+      writeDiskCache("stm-horarios.json", compactHorarioRows(rows), MIN_HORARIOS);
       return rows;
     });
   }
@@ -350,7 +355,7 @@ export class CkanClient {
     }
 
     if (!this.skipDiskCache) {
-      const diskData = readDiskCache<LineaVariante[]>("stm-lineas.json", DISK_TTL_6M);
+      const diskData = readDiskCache<LineaVariante[]>("stm-lineas.json", DISK_TTL_6M, MIN_LINEAS);
       if (diskData) {
         this.cache.set(cacheKey, diskData, TTL_1M);
         return diskData;
@@ -378,7 +383,7 @@ export class CkanClient {
       }));
 
       this.cache.set(cacheKey, lineas, TTL_1M);
-      writeDiskCache("stm-lineas.json", lineas);
+      writeDiskCache("stm-lineas.json", lineas, MIN_LINEAS);
       return lineas;
     });
   }
