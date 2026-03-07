@@ -14,7 +14,7 @@ The goal is to make city infrastructure data accessible through conversational i
 
 ## Demo
 
-<video src="https://github.com/chaba11/mcp-stm-montevideo/raw/main/assets/stm-demo.mp4" controls width="100%"></video>
+https://github.com/user-attachments/assets/805a692b-b2cc-4223-9abf-e7d5edf99eb6
 
 ---
 
