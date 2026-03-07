@@ -141,6 +141,8 @@ As AI assistants become more common, exposing real-world systems through MCP ser
 
 This project explores how public transportation systems can integrate with the AI tooling ecosystem in a practical, developer-friendly way.
 
+This project was also an experiment: exploring MCPs as a way to connect real-world data with LLMs, and evaluating autonomous software development — most of the code was generated with [Claude Code](https://claude.ai/claude-code) following a methodology of sequential loops (Ralph Loops).
+
 ---
 
 ## Links
